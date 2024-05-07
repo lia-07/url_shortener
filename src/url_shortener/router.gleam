@@ -7,20 +7,29 @@ pub fn handle_request(req: Request) -> Response {
 
   case wisp.path_segments(req) {
     [] -> {
-      "<h1>There's nothing here. Try visiting <code>/name/:yourname</code> for a present."
-      |> string_builder.from_string()
-      |> wisp.html_response(200)
+      wisp.ok()
+      |> wisp.html_body(string_builder.from_string(
+        "<h1>There's nothing here. Try visiting <code>/name/:yourname</code> for a present. <img alt=\"200: Ok\" src=\"https://http.cat/200\">",
+      ))
     }
     ["name"] -> {
-      "<h1>So you're not going to tell me your name? Try visiting <code>/name/:yourname</code>.</h1>"
-      |> string_builder.from_string()
-      |> wisp.html_response(400)
+      wisp.bad_request()
+      |> wisp.html_body(string_builder.from_string(
+        "<h1>So you're not going to tell me your name? Try visiting <code>/name/:yourname</code>.</h1><img alt=\"Error 400: Bad Request\" src=\"https://http.cat/400\">",
+      ))
     }
     ["name", name] -> {
-      { "<h1>Hi " <> name <> "!</h1><br><p>Here is a present: &#127873;</p>" }
-      |> string_builder.from_string()
-      |> wisp.html_response(200)
+      wisp.ok()
+      |> wisp.html_body(string_builder.from_string(
+        "<h1>Hi "
+        <> name
+        <> "!</h1><p>Here is a present: &#127873;</p> <img alt=\"200: Ok\" src=\"https://http.cat/200\">",
+      ))
     }
-    _ -> wisp.not_found()
+    _ ->
+      wisp.not_found()
+      |> wisp.html_body(string_builder.from_string(
+        "<img alt=\"Error 404: Not found\" src=\"https://http.cat/404\">",
+      ))
   }
 }
