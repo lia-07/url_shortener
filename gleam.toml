@@ -17,6 +17,7 @@ gleam_stdlib = "~> 0.34 or ~> 1.0"
 wisp = "~> 0.14"
 mist = "~> 1.0"
 gleam_erlang = "~> 0.25"
+sqlight = "~> 0.9"
 
 [dev-dependencies]
 gleeunit = "~> 1.0"
