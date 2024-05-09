@@ -1,9 +1,9 @@
-import gleam/io
 import gleam/erlang/process
 import wisp
 import mist
 import url_shortener/router
 import url_shortener/database
+import url_shortener/web
 
 pub const db_name = "db.sqlite3"
 
@@ -18,7 +18,9 @@ pub fn main() {
 
   use db <- database.with_connection(db_name)
 
-  let handler = router.handle_request(_)
+  let context = web.Context(db)
+
+  let handler = router.handle_request(_, context)
 
   let assert Ok(_) =
     handler

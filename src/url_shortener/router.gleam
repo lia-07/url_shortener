@@ -1,8 +1,8 @@
 import gleam/string_builder
 import wisp.{type Request, type Response}
-import url_shortener/web
+import url_shortener/web.{type Context}
 
-pub fn handle_request(req: Request) -> Response {
+pub fn handle_request(req: Request, ctx: Context) -> Response {
   use req <- web.middleware(req)
 
   case wisp.path_segments(req) {
