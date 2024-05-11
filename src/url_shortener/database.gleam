@@ -9,12 +9,6 @@ pub fn with_connection(name: String, func: fn(sqlight.Connection) -> a) -> a {
 }
 
 pub fn migrate_schema(db: sqlight.Connection) -> Result(Nil, AppError) {
-  sqlight.exec(
-    "CREATE TABLE IF NOT EXISTS names (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL CHECK(length(name) > 0)
-    );",
-    db,
-  )
+  sqlight.exec("", db)
   |> result.map_error(error.SqlightError)
 }
