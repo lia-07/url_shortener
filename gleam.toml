@@ -19,6 +19,7 @@ mist = "~> 1.0"
 gleam_erlang = "~> 0.25"
 sqlight = "~> 0.9"
 glanoid = "~> 1.0"
+birl = "~> 1.6"
 
 [dev-dependencies]
 gleeunit = "~> 1.0"
