@@ -18,8 +18,6 @@ wisp = "~> 0.14"
 mist = "~> 1.0"
 gleam_erlang = "~> 0.25"
 sqlight = "~> 0.9"
-glanoid = "~> 1.0"
-birl = "~> 1.6"
 gleam_otp = "~> 0.10"
 gleam_crypto = "~> 1.3"
 
