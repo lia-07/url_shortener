@@ -5,7 +5,7 @@ import gleam/list
 import wisp
 import mist
 import birl
-import birl/duration.{type Duration, type Unit}
+import birl/duration.{type Duration}
 import url_shortener/router
 import url_shortener/database
 import url_shortener/link
@@ -24,10 +24,10 @@ fn x_times(x, f: fn(Int) -> String) {
 }
 
 type Trial {
-  Trial(generator: String, duration: Int)
+  Trial(generator: String, duration: Float)
 }
 
-const times = 100_000
+const times = 1_000_000
 
 pub fn main() {
   let trials: List(Trial) = []
@@ -38,28 +38,34 @@ pub fn main() {
   let end = birl.now()
   let length =
     birl.difference(end, start)
-    |> duration.blur_to(Unit.Second)
+    |> duration.blur_to(duration.MilliSecond)
   let trials =
     trials
-    |> list.append([Trial("Nanoid", length)])
+    |> list.append([Trial("Nanoid", { int.to_float(length) /. 1000.0 })])
 
   io.print("\nCrypto and Base64-based generator:\n")
   let start = birl.now()
   x_times(times, link.random_back_half_from_crypto)
   let end = birl.now()
-  let duration = birl.difference(end, start)
+  let length =
+    birl.difference(end, start)
+    |> duration.blur_to(duration.MilliSecond)
   let trials =
     trials
-    |> list.append([Trial("Crypto/Base64", duration)])
+    |> list.append([Trial("Crypto/Base64", int.to_float(length) /. 1000.0)])
 
   io.print("\nRandom list-based generator:\n")
   let start = birl.now()
   x_times(times, link.random_back_half_from_random_list)
   let end = birl.now()
-  let duration = birl.difference(end, start)
+  let length =
+    birl.difference(end, start)
+    |> duration.blur_to(duration.MilliSecond)
   let trials =
     trials
-    |> list.append([Trial("Random List", duration)])
+    |> list.append([
+      Trial("Random list-based", { int.to_float(length) /. 1000.0 }),
+    ])
 
   io.print("\nFinal Results:")
   io.debug(trials)

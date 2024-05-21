@@ -1,6 +1,3 @@
-import gleam/float
-import gleam/result
-import gleam/int
 import gleam/crypto
 import gleam/bit_array
 import gleam/string
@@ -10,7 +7,7 @@ import glanoid
 pub fn random_back_half_from_nanoid(length: Int) -> String {
   let assert Ok(nanoid) =
     glanoid.make_generator(
-      "_-!?@#$%&0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+      "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_",
     )
   nanoid(length)
 }
@@ -29,7 +26,7 @@ pub fn random_back_half_from_random_list(length: Int) -> String {
 
   let characters =
     string.to_graphemes(
-      "_-!?@#$%&0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+      "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_",
     )
   generate_random_string(length, characters, 0, "")
 }
