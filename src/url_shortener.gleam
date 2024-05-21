@@ -5,7 +5,7 @@ import gleam/list
 import wisp
 import mist
 import birl
-import birl/duration.{type Duration}
+import birl/duration
 import url_shortener/router
 import url_shortener/database
 import url_shortener/link
