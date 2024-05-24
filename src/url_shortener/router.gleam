@@ -1,7 +1,10 @@
 import gleam/string_builder
 import gleam/string
+import gleam/http.{Get, Post}
+import gleam/io
 import gleam/json.{array, bool, int, null, object, string}
 import wisp.{type Request, type Response}
+import url_shortener/link
 import url_shortener/web.{type Context}
 
 pub fn handle_request(req: Request, ctx: Context) -> Response {
@@ -23,21 +26,35 @@ fn api_version_handler(req, ctx, version) {
     _ ->
       wisp.not_found()
       |> wisp.json_body(
-        json.to_string_builder(
-          object([
-            #("success", bool(False)),
-            #("error", string("Specified API version is invalid")),
-          ]),
-        ),
+        object([
+          #("success", bool(False)),
+          #("error", string("Specified API version is invalid")),
+        ])
+        |> json.to_string_builder(),
       )
   }
 }
 
-fn api_v1_handler(req, ctx, endpoint) {
-  wisp.ok()
-  |> wisp.json_body(
-    json.to_string_builder(
-      object([#("success", bool(True)), #("response", string("hi"))]),
-    ),
-  )
+fn api_v1_handler(req: Request, ctx, endpoint) {
+  case endpoint {
+    ["link"] -> v1_link_handler(req, ctx)
+    _ -> {
+      wisp.not_found()
+      |> wisp.json_body(
+        object([
+          #("success", bool(False)),
+          #("error", string("Unknown endpoint requested")),
+        ])
+        |> json.to_string_builder(),
+      )
+    }
+  }
+}
+
+fn v1_link_handler(req: Request, ctx) {
+  case req.method {
+    Post -> link.shorten(req, ctx)
+    Get -> link.info(req, ctx)
+    _ -> wisp.method_not_allowed([Get, Post])
+  }
 }
