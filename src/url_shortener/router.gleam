@@ -22,7 +22,7 @@ pub fn handle_request(req: Request, ctx: Context) -> Response {
 
 fn api_version_handler(req, ctx, version) {
   case version {
-    ["v1", ..endpoint] -> api_v1_handler(req, ctx, endpoint)
+    ["v1", ..endpoint] -> v1_api_handler(req, ctx, endpoint)
     _ ->
       wisp.not_found()
       |> wisp.json_body(
@@ -35,7 +35,7 @@ fn api_version_handler(req, ctx, version) {
   }
 }
 
-fn api_v1_handler(req: Request, ctx, endpoint) {
+fn v1_api_handler(req: Request, ctx, endpoint) {
   case endpoint {
     ["link"] -> v1_link_handler(req, ctx)
     _ -> {
