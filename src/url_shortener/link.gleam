@@ -6,6 +6,7 @@ import gleam/bit_array
 import gleam/string
 import gleam/json.{array, bool, int, null, object, string}
 import wisp.{type Request, type Response}
+import url_shortener/web.{json_response}
 
 pub fn random_back_half(length: Int) -> String {
   crypto.strong_random_bytes(length)
@@ -30,25 +31,9 @@ pub fn shorten(req: Request, ctx) -> Response {
     _ -> io.debug("help")
   }
 
-  // not implemented 
-  wisp.response(501)
-  |> wisp.json_body(
-    object([
-      #("success", bool(False)),
-      #("error", string("Shorten endpoint not yet implemented")),
-    ])
-    |> json.to_string_builder(),
-  )
+  json_response(501, False, string("Create endpoint is not yet implemented"))
 }
 
 pub fn info(req: Request, ctx) -> Response {
-  // not implemented 
-  wisp.response(501)
-  |> wisp.json_body(
-    object([
-      #("success", bool(False)),
-      #("error", string("Info endpoint not yet implemented")),
-    ])
-    |> json.to_string_builder(),
-  )
+  json_response(501, False, string("Info endpoint is not yet implemented"))
 }

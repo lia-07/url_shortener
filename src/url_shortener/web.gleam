@@ -1,3 +1,4 @@
+import gleam/json.{type Json}
 import wisp.{type Request, type Response}
 import sqlight
 
@@ -15,4 +16,12 @@ pub fn middleware(
   use req <- wisp.handle_head(req)
 
   handle_request(req)
+}
+
+pub fn json_response(code: Int, success: Bool, body: Json) -> Response {
+  wisp.response(code)
+  |> wisp.json_body(
+    json.object([#("success", json.bool(success)), #("error", body)])
+    |> json.to_string_builder(),
+  )
 }
