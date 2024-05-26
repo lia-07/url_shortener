@@ -1,5 +1,6 @@
 import gleam/crypto
 import gleam/dict
+import gleam/result
 import gleam/dynamic
 import gleam/io
 import gleam/bit_array
@@ -15,23 +16,44 @@ pub fn random_back_half(length: Int) -> String {
 }
 
 pub fn shorten(req: Request, ctx) -> Response {
-  use json <- wisp.require_json(req)
-  io.debug(json)
-  let data =
-    json
-    |> dynamic.dict(dynamic.string, dynamic.string)
+  let json =
+    wisp.read_body_to_bitstring(req)
+    |> result.unwrap(<<0>>)
+    |> json.decode_bits(dynamic.dict(dynamic.string, dynamic.string))
 
-  case data {
-    Ok(d) -> {
-      case dict.get(d, "url") {
-        Ok(u) -> io.debug(u)
-        _ -> io.debug("help")
+  case json {
+    Ok(j) -> {
+      case dict.get(j, "url") {
+        Ok(u) ->
+          json_response(
+            201,
+            True,
+            object([
+              #("back_half", string(random_back_half(5))),
+              #("original_url", string(u)),
+            ]),
+          )
+        Error(_) -> json_response(400, False, string("URL not specified"))
       }
     }
-    _ -> io.debug("help")
-  }
+    Error(x) ->
+      case x {
+        json.UnexpectedFormat([dynamic.DecodeError(e, f, _)]) ->
+          json_response(
+            400,
+            False,
+            string(
+              "Invalid data type (expected "
+              <> string.lowercase(e)
+              <> ", found "
+              <> string.lowercase(f)
+              <> ")",
+            ),
+          )
 
-  json_response(501, False, string("Create endpoint is not yet implemented"))
+        _ -> json_response(400, False, string("Invalid JSON"))
+      }
+  }
 }
 
 pub fn info(req: Request, ctx) -> Response {
