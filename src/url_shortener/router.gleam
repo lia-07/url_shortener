@@ -2,6 +2,7 @@ import gleam/http.{Get, Post}
 import gleam/int
 import gleam/io
 import gleam/json.{array, bool, int, null, object, string}
+import gleam/otp/task
 import gleam/string
 import gleam/string_builder
 import url_shortener/error.{type AppError}
@@ -21,7 +22,7 @@ pub fn handle_request(req: Request, ctx: Context) -> Response {
 fn shortened_link_handler(back_half, req, ctx) {
   case link.get(back_half, req, ctx) {
     Ok(match) -> {
-      link.hit(match.back_half, ctx)
+      task.async(fn() { link.hit(match.back_half, ctx) })
       wisp.moved_permanently(match.original_url)
     }
     Error(_) -> wisp.not_found()
