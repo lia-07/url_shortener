@@ -18,7 +18,7 @@ pub fn handle_request(req: Request, ctx: Context) -> Response {
 
 fn shortened_link_handler(back_half, req, ctx) {
   case link.get(back_half, req, ctx) {
-    Ok(original_url) -> wisp.moved_permanently(original_url)
+    Ok(match) -> wisp.moved_permanently(match.original_url)
     Error(_) -> wisp.not_found()
   }
 }
@@ -37,7 +37,7 @@ fn api_version_handler(req, ctx, version) {
 
 fn v1_api_handler(req: Request, ctx, endpoint) {
   case endpoint {
-    ["link"] -> v1_api_link_handler(req, ctx)
+    ["link", ..rest] -> v1_api_link_handler(req, ctx, rest)
     _ -> {
       json_response(
         code: 404,
@@ -48,10 +48,19 @@ fn v1_api_handler(req: Request, ctx, endpoint) {
   }
 }
 
-fn v1_api_link_handler(req: Request, ctx) {
-  case req.method {
-    Post -> link.shorten(req, ctx)
-    Get -> link.info(req, ctx)
-    _ -> wisp.method_not_allowed([Get, Post])
+fn v1_api_link_handler(req: Request, ctx, rest) {
+  case rest {
+    [] -> {
+      case req.method {
+        Post -> link.shorten(req, ctx)
+        _ -> wisp.method_not_allowed([Post])
+      }
+    }
+    link -> {
+      case req.method {
+        Get -> link.info(req, ctx, string.concat(link))
+        _ -> wisp.method_not_allowed([Get])
+      }
+    }
   }
 }

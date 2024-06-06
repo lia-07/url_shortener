@@ -56,7 +56,7 @@ pub fn get(back_half: String, req: Request, ctx: web.Context) {
       Error(error.NotFound)
     }
     [link, ..] -> {
-      Ok(link.original_url)
+      Ok(link)
     }
   }
 }
@@ -73,8 +73,38 @@ pub fn shorten(req: Request, ctx) -> Response {
   }
 }
 
-pub fn info(req: Request, ctx) -> Response {
-  json_response(501, False, string("Info endpoint is not yet implemented"))
+pub fn info(req, ctx, link) {
+  case get(link, req, ctx) {
+    Ok(Link(back_half, original_url, hits, created)) -> {
+      json_response(
+        code: 200,
+        success: True,
+        body: object([
+          #("back_half", string(back_half)),
+          #("original_url", string(original_url)),
+          #("hits", int(hits)),
+          #("created", string(created)),
+        ]),
+      )
+    }
+    Error(err) ->
+      case err {
+        error.NotFound -> {
+          json_response(
+            code: 404,
+            success: False,
+            body: string("Specified link not found"),
+          )
+        }
+        _ -> {
+          json_response(
+            code: 500,
+            success: False,
+            body: string("An unexpected error occured"),
+          )
+        }
+      }
+  }
 }
 
 fn handle_json(data: Dict(String, String), ctx) {
