@@ -13,8 +13,52 @@ import url_shortener/error.{type AppError}
 import url_shortener/web.{json_response}
 import wisp.{type Request, type Response}
 
-type Link {
+pub type Link {
   Link(back_half: String, original_url: String, hits: Int, created: String)
+}
+
+fn link_decoder() -> dynamic.Decoder(Link) {
+  dynamic.decode4(
+    Link,
+    dynamic.element(0, dynamic.string),
+    dynamic.element(1, dynamic.string),
+    dynamic.element(2, dynamic.int),
+    dynamic.element(3, dynamic.string),
+  )
+}
+
+pub fn get(back_half: String, req: Request, ctx: web.Context) {
+  let stmt =
+    "
+  SELECT * FROM links
+  WHERE back_half = (?1)
+  "
+  use rows <- result.then(
+    sqlight.query(
+      stmt,
+      on: ctx.db,
+      with: [sqlight.text(back_half)],
+      expecting: link_decoder(),
+    )
+    |> result.map_error(fn(error) {
+      case error.code, error.message {
+        sqlight.ConstraintCheck, "CHECK constraint failed: empty_content" ->
+          error.ContentRequired
+        _, _ -> {
+          error.BadRequest
+        }
+      }
+    }),
+  )
+
+  case rows {
+    [] -> {
+      Error(error.NotFound)
+    }
+    [link, ..] -> {
+      Ok(link.original_url)
+    }
+  }
 }
 
 pub fn shorten(req: Request, ctx) -> Response {
@@ -122,23 +166,14 @@ fn validate_and_process_url(url, ctx) {
   }
 }
 
-fn link_decoder() -> dynamic.Decoder(Link) {
-  dynamic.decode4(
-    Link,
-    dynamic.element(0, dynamic.string),
-    dynamic.element(1, dynamic.string),
-    dynamic.element(2, dynamic.int),
-    dynamic.element(3, dynamic.string),
-  )
-}
-
 fn insert_url(
   back_half,
   original_url,
   ctx: web.Context,
 ) -> Result(Link, AppError) {
   let stmt =
-    "INSERT INTO links (back_half, original_url) 
+    "
+    INSERT INTO links (back_half, original_url) 
     VALUES (?1, ?2) 
     RETURNING back_half, original_url, hits, created"
   use rows <- result.then(
@@ -152,8 +187,15 @@ fn insert_url(
       case error.code, error.message {
         sqlight.ConstraintCheck, "CHECK constraint failed: empty_content" ->
           error.ContentRequired
+        sqlight.ConstraintPrimarykey,
+          "UNIQUE constraint failed: links.back_half"
+        -> {
+          io.debug("collison")
+          error.SqlightError(error)
+        }
         _, _ -> {
-          io.print_error(error.message)
+          io.debug(error.code)
+          io.debug(error.message)
           error.BadRequest
         }
       }
@@ -161,6 +203,5 @@ fn insert_url(
   )
 
   let assert [link] = rows
-  io.debug(link)
   Ok(link)
 }
