@@ -107,6 +107,24 @@ pub fn info(req, ctx, link) {
   }
 }
 
+pub fn hit(back_half, ctx: web.Context) {
+  let stmt =
+    "
+  UPDATE links 
+  SET hits = hits + 1 
+  WHERE back_half = (?1)
+  returning hits
+  "
+
+  let _ =
+    sqlight.query(
+      stmt,
+      on: ctx.db,
+      with: [sqlight.text(back_half)],
+      expecting: dynamic.int,
+    )
+}
+
 fn handle_json(data: Dict(String, String), ctx) {
   case dict.get(data, "url") {
     Ok(url) -> validate_and_process_url(url, ctx)
@@ -205,7 +223,8 @@ fn insert_url(
     "
     INSERT INTO links (back_half, original_url) 
     VALUES (?1, ?2) 
-    RETURNING back_half, original_url, hits, created"
+    RETURNING back_half, original_url, hits, created
+    "
   use rows <- result.then(
     sqlight.query(
       stmt,
