@@ -73,7 +73,7 @@ pub fn shorten(req: Request, ctx) -> Response {
   }
 }
 
-pub fn info(req, ctx, link) {
+pub fn info(ctx, link) {
   case get(link, ctx) {
     Ok(Link(back_half, original_url, hits, created)) -> {
       json_response(

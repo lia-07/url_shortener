@@ -1,5 +1,4 @@
 import gleam/erlang/process
-import gleam/io
 import mist
 import url_shortener/database
 import url_shortener/router
@@ -9,8 +8,6 @@ import wisp
 pub const db_name = "db.sqlite3"
 
 pub fn main() {
-  io.print("PID")
-  io.debug(process.self())
   wisp.configure_logger()
 
   let secret_key_base = wisp.random_string(64)
