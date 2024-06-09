@@ -3,8 +3,8 @@ import gleam/crypto
 import gleam/dict.{type Dict}
 import gleam/dynamic
 import gleam/io
-import gleam/json.{array, bool, int, null, object, string}
-import gleam/option.{type Option, Some}
+import gleam/json.{int, object, string}
+import gleam/option.{Some}
 import gleam/result
 import gleam/string
 import gleam/uri
@@ -27,7 +27,7 @@ fn link_decoder() -> dynamic.Decoder(Link) {
   )
 }
 
-pub fn get(back_half: String, req: Request, ctx: web.Context) {
+pub fn get(back_half: String, ctx: web.Context) {
   let stmt =
     "
   SELECT * FROM links
@@ -74,7 +74,7 @@ pub fn shorten(req: Request, ctx) -> Response {
 }
 
 pub fn info(req, ctx, link) {
-  case get(link, req, ctx) {
+  case get(link, ctx) {
     Ok(Link(back_half, original_url, hits, created)) -> {
       json_response(
         code: 200,
@@ -159,32 +159,6 @@ fn handle_json(data: Dict(String, String), ctx) {
     Error(_) -> json_response(400, False, string("URL not specified"))
   }
 }
-
-// fn name_handler(name: String, ctx: Context) {
-//   let stmt = "INSERT INTO names (name) VALUES (?1) RETURNING id"
-//   use rows <- result.then(
-//     sqlight.query(
-//       stmt,
-//       on: ctx.db,
-//       with: [sqlight.text(name)],
-//       expecting: dynamic.element(0, dynamic.int),
-//     )
-//     |> result.map_error(fn(error) {
-//       case error.code, error.message {
-//         sqlight.ConstraintCheck, "CHECK constraint failed: empty_content" ->
-//           error.ContentRequired
-//         _, _ -> {
-//           io.debug(error.message)
-//           error.BadRequest
-//         }
-//       }
-//     }),
-//   )
-
-//   let assert [id] = rows
-//   io.debug(id)
-//   Ok(id)
-// }
 
 pub fn random_back_half(length: Int) -> String {
   crypto.strong_random_bytes(length)

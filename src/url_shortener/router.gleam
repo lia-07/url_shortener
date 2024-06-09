@@ -1,10 +1,7 @@
 import gleam/http.{Get, Post}
-import gleam/io
-import gleam/json.{array, bool, int, null, object, string}
-import gleam/otp/task
+import gleam/json.{string}
 import gleam/string
-import url_shortener/error.{type AppError}
-import url_shortener/link.{type Link}
+import url_shortener/link
 import url_shortener/web.{type Context, json_response}
 import wisp.{type Request, type Response}
 
@@ -13,12 +10,12 @@ pub fn handle_request(req: Request, ctx: Context) -> Response {
 
   case wisp.path_segments(req) {
     ["api", ..version] -> api_version_handler(req, ctx, version)
-    back_half -> shortened_link_handler(string.concat(back_half), req, ctx)
+    back_half -> shortened_link_handler(string.concat(back_half), ctx)
   }
 }
 
-fn shortened_link_handler(back_half, req, ctx) {
-  case link.get(back_half, req, ctx) {
+fn shortened_link_handler(back_half, ctx) {
+  case link.get(back_half, ctx) {
     Ok(match) -> {
       let _ = link.hit(match.back_half, ctx)
       wisp.moved_permanently(match.original_url)
@@ -62,7 +59,7 @@ fn v1_api_link_handler(req: Request, ctx, rest) {
     }
     link -> {
       case req.method {
-        Get -> link.info(req, ctx, string.concat(link))
+        Get -> link.info(ctx, string.concat(link))
         _ -> wisp.method_not_allowed([Get])
       }
     }
