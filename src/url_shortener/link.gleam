@@ -108,21 +108,49 @@ pub fn info(req, ctx, link) {
 }
 
 pub fn hit(back_half, ctx: web.Context) {
+  io.debug("hit fn is being run")
   let stmt =
     "
   UPDATE links 
   SET hits = hits + 1 
   WHERE back_half = (?1)
-  returning hits
+  returning back_half, original_url, hits, created
   "
 
-  let _ =
+  use rows <- result.try(
     sqlight.query(
       stmt,
       on: ctx.db,
       with: [sqlight.text(back_half)],
-      expecting: dynamic.int,
+      expecting: link_decoder(),
     )
+    |> result.map_error(fn(error) {
+      case error.code, error.message {
+        sqlight.ConstraintCheck, "CHECK constraint failed: empty_content" ->
+          error.ContentRequired
+        sqlight.ConstraintPrimarykey,
+          "UNIQUE constraint failed: links.back_half"
+        -> {
+          io.debug("collison")
+          error.SqlightError(error)
+        }
+        _, _ -> {
+          io.debug(error.code)
+          io.debug(error.message)
+          error.BadRequest
+        }
+      }
+    }),
+  )
+
+  case rows {
+    [] -> {
+      Error(error.NotFound)
+    }
+    [link, ..] -> {
+      Ok(link.hits)
+    }
+  }
 }
 
 fn handle_json(data: Dict(String, String), ctx) {
