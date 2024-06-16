@@ -2,10 +2,12 @@ import gleam/json.{type Json}
 import sqlight
 import wisp.{type Request, type Response}
 
+// type contains our context constructor. currently only holds db connection
 pub type Context {
   Context(db: sqlight.Connection)
 }
 
+// wisp stuff
 pub fn middleware(
   req: Request,
   handle_request: fn(Request) -> Response,
@@ -18,6 +20,8 @@ pub fn middleware(
   handle_request(req)
 }
 
+// wrapper for json responses returned by the api. takes in http code, success 
+// (cont.) boolean, and body content. responds with a json response
 pub fn json_response(
   code code: Int,
   success success: Bool,
