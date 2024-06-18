@@ -2,6 +2,7 @@ import gleam/bit_array
 import gleam/crypto
 import gleam/dict
 import gleam/dynamic
+import gleam/int
 import gleam/io
 import gleam/json.{int, object, string}
 import gleam/option.{Some}
@@ -90,7 +91,8 @@ pub fn shorten(req: Request, ctx) -> Response {
             Ok(uri.Uri(protocol, ..))
               if protocol == Some("http") || protocol == Some("https")
             -> {
-              let link = insert_url(random_back_half(5), url, ctx)
+              // start with a four digit back half
+              let link = insert_url(url, ctx, 4)
               case link {
                 // if it was successful, respond with success with data about it
                 Ok(Link(back_half, original_url, _, created)) ->
@@ -237,52 +239,69 @@ pub fn hit(back_half, ctx: web.Context) {
 
 // generate a random back half of a given length. uses base64
 pub fn random_back_half(length: Int) -> String {
-  crypto.strong_random_bytes(length)
-  |> bit_array.base64_url_encode(False)
-  |> string.slice(0, length)
+  case length {
+    _ ->
+      crypto.strong_random_bytes(length)
+      |> bit_array.base64_url_encode(False)
+      |> string.slice(0, length)
+  }
 }
 
 // insert a url to the database
-fn insert_url(
-  back_half,
-  original_url,
-  ctx: web.Context,
-) -> Result(Link, AppError) {
+fn insert_url(original_url, ctx: web.Context, i: Int) -> Result(Link, AppError) {
+  // the use of i means we can run this function recursively if collisions occur
+  let back_half = random_back_half(i)
+
   let stmt =
     "
     INSERT INTO links (back_half, original_url) 
     VALUES (?1, ?2) 
     RETURNING back_half, original_url, hits, created
     "
+
   // query db with above statement
-  use rows <- result.then(
+  let rows =
     sqlight.query(
       stmt,
       on: ctx.db,
       with: [sqlight.text(back_half), sqlight.text(original_url)],
       expecting: link_decoder(),
     )
-    // if there's an error, return an error
-    |> result.map_error(fn(error) {
-      case error.code, error.message {
-        sqlight.ConstraintCheck, "CHECK constraint failed: empty_content" ->
-          error.ContentRequired
+
+  case rows {
+    // if the query was successful, return the newly shortened link
+    Ok(row) -> {
+      let assert [link] = row
+      Ok(link)
+    }
+    // if the query failed, return an error or try again with a 1 digit longer
+    // (cont.) random back half
+    Error(err) -> {
+      case err.code, err.message {
+        // if a collision happened (i.e. tried to insert with the same 
+        // (cont.) back half)
         sqlight.ConstraintPrimarykey,
           "UNIQUE constraint failed: links.back_half"
         -> {
-          io.debug("collison")
-          error.SqlightError(error)
+          wisp.log_warning(
+            "Collision: \"" <> back_half <> "\", len: " <> int.to_string(i),
+          )
+          // run this function again but with i incremented
+          insert_url(original_url, ctx, i + 1)
         }
-        // catch all
+        // catch all, return a bad request error and print the details
         _, _ -> {
-          io.debug(error.code)
-          io.debug(error.message)
-          error.BadRequest
+          wisp.log_error(err.message)
+          io.debug(err.code)
+          Error(
+            error.SqlightError(sqlight.SqlightError(
+              err.code,
+              err.message,
+              err.offset,
+            )),
+          )
         }
       }
-    }),
-  )
-
-  let assert [link] = rows
-  Ok(link)
+    }
+  }
 }
