@@ -239,12 +239,9 @@ pub fn hit(back_half, ctx: web.Context) {
 
 // generate a random back half of a given length. uses base64
 pub fn random_back_half(length: Int) -> String {
-  case length {
-    _ ->
-      crypto.strong_random_bytes(length)
-      |> bit_array.base64_url_encode(False)
-      |> string.slice(0, length)
-  }
+  crypto.strong_random_bytes(length)
+  |> bit_array.base64_url_encode(False)
+  |> string.slice(0, length)
 }
 
 // insert a url to the database
