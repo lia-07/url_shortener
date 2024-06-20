@@ -151,30 +151,6 @@ pub fn shorten(req: Request, ctx) -> Response {
           )
       }
     }
-    // // start with a four digit back half
-    // let link = insert_link(url, ctx, 4)
-    // case link {
-    //   // if it was successful, respond with success with data about it
-    // Ok(Link(back_half, original_url, _, created)) ->
-    //   json_response(
-    //     code: 201,
-    //     success: True,
-    //     body: object([
-    //       #("back_half", string(back_half)),
-    //       #("original_url", string(original_url)),
-    //       #("created", string(created)),
-    //     ]),
-    //   )
-    //   // if it failed, respond with a server error
-    //   Error(_) ->
-    //     json_response(
-    //       code: 500,
-    //       success: False,
-    //       body: string("An unexpected error occurred"),
-    //     )
-    // }
-
-    // if the json parsing failed, return a client error
   }
 }
 
