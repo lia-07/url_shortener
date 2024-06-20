@@ -78,7 +78,7 @@ fn parse_json(req: Request) -> Result(Dict(String, String), AppError) {
 
   case json {
     Ok(j) -> Ok(j)
-    Error(_) -> Error(error.BadRequest)
+    Error(e) -> Error(error.JsonError(e))
   }
 }
 
@@ -89,10 +89,10 @@ fn get_url(json: Dict(String, String)) {
         Ok(uri.Uri(protocol, ..))
           if protocol == Some("http") || protocol == Some("https")
         -> Ok(url)
-        _ -> Error(error.BadRequest)
+        _ -> Error(error.InvalidUrl)
       }
     }
-    Error(_) -> Error(error.BadRequest)
+    Error(_) -> Error(error.InvalidUrl)
   }
 }
 
@@ -122,50 +122,60 @@ pub fn shorten(req: Request, ctx) -> Response {
         ]),
       )
     }
-    Error(_) -> {
+    Error(err) -> {
       case err {
         // if the error was caused by an invalid type
-        json.UnexpectedFormat([dynamic.DecodeError(e, f, _)]) ->
+        error.JsonError(json.UnexpectedFormat([dynamic.DecodeError(e, f, _)])) ->
           json_response(
             400,
             False,
             string(
-              "Invalid data type (expected "
-              <> string.lowercase(e)
-              <> ", found "
-              <> string.lowercase(f)
-              <> ")",
+              "Invalid data type (expected " <> e <> ", found " <> f <> ")",
             ),
           )
-        // don't care about what other errors they did, return generic failure
-      //   _ -> 
-      json_response(400, False, string("Invalid JSON"))
+        error.JsonError(_) ->
+          json_response(code: 400, success: False, body: string("Invalid JSON"))
+        error.Conflict ->
+          json_response(
+            409,
+            False,
+            string("Requested back half already in use"),
+          )
+        error.InvalidUrl ->
+          json_response(code: 400, success: False, body: string("Invalid Url"))
+        _ ->
+          json_response(
+            code: 500,
+            success: False,
+            body: string("An unexpected error"),
+          )
+      }
     }
-  }
-  // // start with a four digit back half
-  // let link = insert_link(url, ctx, 4)
-  // case link {
-  //   // if it was successful, respond with success with data about it
-  // Ok(Link(back_half, original_url, _, created)) ->
-  //   json_response(
-  //     code: 201,
-  //     success: True,
-  //     body: object([
-  //       #("back_half", string(back_half)),
-  //       #("original_url", string(original_url)),
-  //       #("created", string(created)),
-  //     ]),
-  //   )
-  //   // if it failed, respond with a server error
-  //   Error(_) ->
-  //     json_response(
-  //       code: 500,
-  //       success: False,
-  //       body: string("An unexpected error occurred"),
-  //     )
-  // }
+    // // start with a four digit back half
+    // let link = insert_link(url, ctx, 4)
+    // case link {
+    //   // if it was successful, respond with success with data about it
+    // Ok(Link(back_half, original_url, _, created)) ->
+    //   json_response(
+    //     code: 201,
+    //     success: True,
+    //     body: object([
+    //       #("back_half", string(back_half)),
+    //       #("original_url", string(original_url)),
+    //       #("created", string(created)),
+    //     ]),
+    //   )
+    //   // if it failed, respond with a server error
+    //   Error(_) ->
+    //     json_response(
+    //       code: 500,
+    //       success: False,
+    //       body: string("An unexpected error occurred"),
+    //     )
+    // }
 
-  // if the json parsing failed, return a client error
+    // if the json parsing failed, return a client error
+  }
 }
 
 // get info about a given link. most work is done in the get() function

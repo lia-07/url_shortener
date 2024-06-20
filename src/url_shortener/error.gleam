@@ -1,12 +1,14 @@
+import gleam/json
 import sqlight
 
 // types of app error
 pub type AppError {
   NotFound
+  ContentRequired
   MethodNotAllowed
   Conflict
   BadRequest
-  UnprocessableEntity
-  ContentRequired
+  InvalidUrl
+  JsonError(json.DecodeError)
   SqlightError(sqlight.Error)
 }
