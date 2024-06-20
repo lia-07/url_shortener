@@ -5,6 +5,7 @@ import gleam/dynamic
 import gleam/io
 import gleam/json.{int, object, string}
 import gleam/option.{type Option, None, Some}
+import gleam/regex
 import gleam/result
 import gleam/string
 import gleam/uri
@@ -96,6 +97,21 @@ fn get_url(json: Dict(String, String)) {
   }
 }
 
+fn get_requested_back_half(
+  json: Dict(String, String),
+) -> Result(Option(String), AppError) {
+  case dict.get(json, "back_half") {
+    Ok(back_half) -> {
+      let assert Ok(r) = regex.from_string("^[A-Za-z0-9_-]{3,32}$")
+      case regex.check(r, back_half) {
+        True -> Ok(Some(back_half))
+        False -> Error(error.InvalidBackHalf)
+      }
+    }
+    Error(_) -> Ok(None)
+  }
+}
+
 // shorten a link
 pub fn shorten(req: Request, ctx) -> Response {
   // attempt to decode the request body as json
@@ -104,9 +120,10 @@ pub fn shorten(req: Request, ctx) -> Response {
 
     use url <- result.try(get_url(json))
 
-    case dict.get(json, "back_half") {
-      Ok(back_half) -> insert_link(url, ctx, Some(back_half), None)
-      Error(_) -> insert_link(url, ctx, None, Some(4))
+    case get_requested_back_half(json) {
+      Ok(None) -> insert_link(url, ctx, None, Some(4))
+      Ok(Some(back_half)) -> insert_link(url, ctx, Some(back_half), None)
+      Error(_) -> Error(error.InvalidBackHalf)
     }
   }
 
@@ -142,7 +159,16 @@ pub fn shorten(req: Request, ctx) -> Response {
             string("Requested back half already in use"),
           )
         error.InvalidUrl ->
-          json_response(code: 400, success: False, body: string("Invalid Url"))
+          json_response(code: 400, success: False, body: string("Invalid URL"))
+        error.InvalidBackHalf ->
+          json_response(
+            code: 400,
+            success: False,
+            body: string(
+              "Requested back half invalid: must be between 3 and 32 characters long and only contain characters A-Z, a-z, 0-9, '-', and '_'",
+            ),
+          )
+
         _ ->
           json_response(
             code: 500,
@@ -294,16 +320,17 @@ fn insert_link(
         sqlight.ConstraintPrimarykey,
           "UNIQUE constraint failed: links.back_half"
         -> {
-          wisp.log_warning("Collision: \"" <> back_half <> "\"")
-
           case option.is_some(i) {
-            True ->
+            True -> {
+              wisp.log_warning("Collision: \"" <> back_half <> "\"")
+
               insert_link(
                 original_url,
                 ctx,
                 None,
                 Some(option.unwrap(i, 4) + 1),
               )
+            }
             False -> Error(error.Conflict)
           }
         }

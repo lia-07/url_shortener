@@ -9,6 +9,7 @@ pub type AppError {
   Conflict
   BadRequest
   InvalidUrl
+  InvalidBackHalf
   JsonError(json.DecodeError)
   SqlightError(sqlight.Error)
 }
