@@ -4,6 +4,7 @@ import sqlight
 pub type AppError {
   NotFound
   MethodNotAllowed
+  Conflict
   BadRequest
   UnprocessableEntity
   ContentRequired
