@@ -1,11 +1,10 @@
 import gleam/bit_array
 import gleam/crypto
-import gleam/dict
+import gleam/dict.{type Dict}
 import gleam/dynamic
-import gleam/int
 import gleam/io
 import gleam/json.{int, object, string}
-import gleam/option.{Some}
+import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
 import gleam/uri
@@ -71,65 +70,59 @@ pub fn get(back_half: String, ctx: web.Context) {
   }
 }
 
-// shorten a link
-pub fn shorten(req: Request, ctx) -> Response {
-  // attempt to decode the request body as json
+fn parse_json(req: Request) -> Result(Dict(String, String), AppError) {
   let json =
     wisp.read_body_to_bitstring(req)
     |> result.unwrap(<<0>>)
     |> json.decode_bits(dynamic.dict(dynamic.string, dynamic.string))
 
   case json {
-    // if the json parsing was successful
-    Ok(data) -> {
-      // see if the json contains a "url" value
-      case dict.get(data, "url") {
-        // validate the "url" and make sure it uses http/s
-        Ok(url) -> {
-          case uri.parse(url) {
-            // insert a new link into the database with a random back half
-            Ok(uri.Uri(protocol, ..))
-              if protocol == Some("http") || protocol == Some("https")
-            -> {
-              // start with a four digit back half
-              let link = insert_url(url, ctx, 4)
-              case link {
-                // if it was successful, respond with success with data about it
-                Ok(Link(back_half, original_url, _, created)) ->
-                  json_response(
-                    code: 201,
-                    success: True,
-                    body: object([
-                      #("back_half", string(back_half)),
-                      #("original_url", string(original_url)),
-                      #("created", string(created)),
-                    ]),
-                  )
-                // if it failed, respond with a server error
-                Error(_) ->
-                  json_response(
-                    code: 500,
-                    success: False,
-                    body: string("An unexpected error occurred"),
-                  )
-              }
-            }
-            // if the url isn't valid or doesn't use http/s...
-            _ -> {
-              json_response(
-                code: 400,
-                success: False,
-                body: string("Invalid URL"),
-              )
-            }
-          }
-        }
-        // if no "url" value is specified
-        Error(_) -> json_response(400, False, string("URL not specified"))
+    Ok(j) -> Ok(j)
+    Error(_) -> Error(error.BadRequest)
+  }
+}
+
+fn get_url(json: Dict(String, String)) {
+  case dict.get(json, "url") {
+    Ok(url) -> {
+      case uri.parse(url) {
+        Ok(uri.Uri(protocol, ..))
+          if protocol == Some("http") || protocol == Some("https")
+        -> Ok(url)
+        _ -> Error(error.BadRequest)
       }
     }
-    // if the json parsing failed, return a client error
-    Error(err) -> {
+    Error(_) -> Error(error.BadRequest)
+  }
+}
+
+// shorten a link
+pub fn shorten(req: Request, ctx) -> Response {
+  // attempt to decode the request body as json
+  let link = {
+    use json <- result.try(parse_json(req))
+
+    use url <- result.try(get_url(json))
+
+    case dict.get(json, "back_half") {
+      Ok(back_half) -> insert_link(url, ctx, Some(back_half), None)
+      Error(_) -> insert_link(url, ctx, None, Some(4))
+    }
+  }
+
+  case link {
+    Ok(Link(back_half, original_url, _, created)) -> {
+      json_response(
+        code: 201,
+        success: True,
+        body: object([
+          #("back_half", string(back_half)),
+          #("original_url", string(original_url)),
+          #("created", string(created)),
+        ]),
+      )
+    }
+    Error(_) -> {
       case err {
         // if the error was caused by an invalid type
         json.UnexpectedFormat([dynamic.DecodeError(e, f, _)]) ->
@@ -145,10 +138,34 @@ pub fn shorten(req: Request, ctx) -> Response {
             ),
           )
         // don't care about what other errors they did, return generic failure
-        _ -> json_response(400, False, string("Invalid JSON"))
-      }
+      //   _ -> 
+      json_response(400, False, string("Invalid JSON"))
     }
   }
+  // // start with a four digit back half
+  // let link = insert_link(url, ctx, 4)
+  // case link {
+  //   // if it was successful, respond with success with data about it
+  // Ok(Link(back_half, original_url, _, created)) ->
+  //   json_response(
+  //     code: 201,
+  //     success: True,
+  //     body: object([
+  //       #("back_half", string(back_half)),
+  //       #("original_url", string(original_url)),
+  //       #("created", string(created)),
+  //     ]),
+  //   )
+  //   // if it failed, respond with a server error
+  //   Error(_) ->
+  //     json_response(
+  //       code: 500,
+  //       success: False,
+  //       body: string("An unexpected error occurred"),
+  //     )
+  // }
+
+  // if the json parsing failed, return a client error
 }
 
 // get info about a given link. most work is done in the get() function
@@ -239,15 +256,26 @@ pub fn hit(back_half, ctx: web.Context) {
 
 // generate a random back half of a given length. uses base64
 pub fn random_back_half(length: Int) -> String {
-  crypto.strong_random_bytes(length)
-  |> bit_array.base64_url_encode(False)
-  |> string.slice(0, length)
+  case length {
+    4 -> "help"
+    5 -> "sigma"
+    _ ->
+      crypto.strong_random_bytes(length)
+      |> bit_array.base64_url_encode(False)
+      |> string.slice(0, length)
+  }
 }
 
 // insert a url to the database
-fn insert_url(original_url, ctx: web.Context, i: Int) -> Result(Link, AppError) {
-  // the use of i means we can run this function recursively if collisions occur
-  let back_half = random_back_half(i)
+fn insert_link(
+  original_url,
+  ctx: web.Context,
+  requested_back_half: Option(String),
+  i: Option(Int),
+) -> Result(Link, AppError) {
+  let back_half =
+    requested_back_half
+    |> option.unwrap(random_back_half(option.unwrap(i, 4)))
 
   let stmt =
     "
@@ -280,11 +308,18 @@ fn insert_url(original_url, ctx: web.Context, i: Int) -> Result(Link, AppError) 
         sqlight.ConstraintPrimarykey,
           "UNIQUE constraint failed: links.back_half"
         -> {
-          wisp.log_warning(
-            "Collision: \"" <> back_half <> "\", len: " <> int.to_string(i),
-          )
-          // run this function again but with i incremented
-          insert_url(original_url, ctx, i + 1)
+          wisp.log_warning("Collision: \"" <> back_half <> "\"")
+
+          case option.is_some(i) {
+            True ->
+              insert_link(
+                original_url,
+                ctx,
+                None,
+                Some(option.unwrap(i, 4) + 1),
+              )
+            False -> Error(error.Conflict)
+          }
         }
         // catch all, return a bad request error and print the details
         _, _ -> {
