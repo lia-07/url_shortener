@@ -5,32 +5,33 @@ import url_shortener/link
 import url_shortener/web.{type Context, json_response}
 import wisp.{type Request, type Response}
 
-// main router function. maps paths to functions that return responses
+// main routing function. maps paths to functions that return responses
 pub fn handle_request(req: Request, ctx: Context) -> Response {
   use req <- web.middleware(req)
 
   case wisp.path_segments(req) {
     // if it's an api route, go to the api handler(s)
     ["api", ..version] -> api_version_handler(req, ctx, version)
-    // catch all, this goes to the shorten link handler. this could be used for
-    // (cont.) a 404 page if this wasn't a url shortener
+
+    // catch all, go to the shorten link handler
     back_half -> shortened_link_handler(string.concat(back_half), ctx)
   }
 }
 
-// try to redirect to the original url of a specified link. if it doesn't exist,
-// (cont.) respond with 404
-fn shortened_link_handler(back_half, ctx) {
+// redirect to original url, or throw 404
+fn shortened_link_handler(back_half, ctx) -> Response {
   case link.get(back_half, ctx) {
     Ok(match) -> {
+      // increment hit
       let _ = link.hit(match.back_half, ctx)
+
       wisp.moved_permanently(match.original_url)
     }
     Error(_) -> wisp.not_found()
   }
 }
 
-// currently there is only v1 for the api, but in the future there might be more
+// currently there is only v1 for the api, expandable in future
 fn api_version_handler(req, ctx, version) {
   case version {
     ["v1", ..endpoint] -> v1_api_handler(req, ctx, endpoint)
@@ -44,7 +45,7 @@ fn api_version_handler(req, ctx, version) {
   }
 }
 
-// currently there is only a link endpoint
+// currently there is only a link endpoint, expandable in future
 fn v1_api_handler(req: Request, ctx, endpoint) {
   case endpoint {
     ["link", ..rest] -> v1_api_link_handler(req, ctx, rest)
@@ -58,17 +59,20 @@ fn v1_api_handler(req: Request, ctx, endpoint) {
   }
 }
 
-// decide whether they were accessing the info endpoint or the create endpoint,
-// (cont.) and activate the corresponding function
+// shorten or info endpoint?
 fn v1_api_link_handler(req: Request, ctx, rest) {
   case rest {
+    // if there is no back half in the url (i.e. /api/v1/link)
     [] -> {
+      // validate http verb
       case req.method {
         Post -> link.shorten(req, ctx)
         _ -> wisp.method_not_allowed([Post])
       }
     }
+    // if there is a back half in the url (i.e. /api/v1/link/example)
     link -> {
+      // validate http verb
       case req.method {
         Get -> link.info(ctx, string.concat(link))
         _ -> wisp.method_not_allowed([Get])

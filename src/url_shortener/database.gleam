@@ -2,8 +2,8 @@ import gleam/result
 import sqlight
 import url_shortener/error.{type AppError}
 
-// connect to database, and run a function. in the main function, we put in the
-// (cont.) "migrate_schema" function, which is defined below
+// connect to database and run a given function. 
+// in the main function, we put in the below "migrate_schema" function
 pub fn with_connection(name: String, func: fn(sqlight.Connection) -> a) -> a {
   use db <- sqlight.with_connection(name)
 

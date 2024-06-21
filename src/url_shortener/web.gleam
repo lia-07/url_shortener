@@ -20,8 +20,7 @@ pub fn middleware(
   handle_request(req)
 }
 
-// wrapper for json responses returned by the api. takes in http code, success 
-// (cont.) boolean, and body content. responds with a json response
+// reusable wrapper for json responses returned by the api
 pub fn json_response(
   code code: Int,
   success success: Bool,
