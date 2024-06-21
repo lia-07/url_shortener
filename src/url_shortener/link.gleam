@@ -19,8 +19,7 @@ pub type Link {
   Link(back_half: String, original_url: String, hits: Int, created: String)
 }
 
-// allows murky data from the database to be transformed into a type-safe 
-// (cont.) gleam dict 
+// allows murky data from the database to be made into a type-safe gleam dict 
 fn link_decoder() -> dynamic.Decoder(Link) {
   dynamic.decode4(
     Link,
@@ -32,7 +31,7 @@ fn link_decoder() -> dynamic.Decoder(Link) {
 }
 
 // return all information on a link with the given back_half
-pub fn get(back_half: String, ctx: web.Context) {
+pub fn get(back_half: String, ctx: web.Context) -> Result(Link, AppError) {
   let stmt =
     "
   SELECT * FROM links
@@ -59,8 +58,7 @@ pub fn get(back_half: String, ctx: web.Context) {
     }),
   )
 
-  // if there are no results, return an error. if there is, return the 
-  // (cont.) first one 
+  // return the first result, if there is one, otherwise an error
   case rows {
     [] -> {
       Error(error.NotFound)
@@ -71,53 +69,11 @@ pub fn get(back_half: String, ctx: web.Context) {
   }
 }
 
-fn parse_json(req: Request) -> Result(Dict(String, String), AppError) {
-  let json =
-    wisp.read_body_to_bitstring(req)
-    |> result.unwrap(<<0>>)
-    |> json.decode_bits(dynamic.dict(dynamic.string, dynamic.string))
-
-  case json {
-    Ok(j) -> Ok(j)
-    Error(e) -> Error(error.JsonError(e))
-  }
-}
-
-fn get_url(json: Dict(String, String)) {
-  case dict.get(json, "url") {
-    Ok(url) -> {
-      case uri.parse(url) {
-        Ok(uri.Uri(protocol, ..))
-          if protocol == Some("http") || protocol == Some("https")
-        -> Ok(url)
-        _ -> Error(error.InvalidUrl)
-      }
-    }
-    Error(_) -> Error(error.InvalidUrl)
-  }
-}
-
-fn get_requested_back_half(
-  json: Dict(String, String),
-) -> Result(Option(String), AppError) {
-  case dict.get(json, "back_half") {
-    Ok(back_half) -> {
-      let assert Ok(r) = regex.from_string("^[A-Za-z0-9_-]{3,32}$")
-      case regex.check(r, back_half) {
-        True -> Ok(Some(back_half))
-        False -> Error(error.InvalidBackHalf)
-      }
-    }
-    Error(_) -> Ok(None)
-  }
-}
-
 // shorten a link
 pub fn shorten(req: Request, ctx) -> Response {
-  // attempt to decode the request body as json
+  // attempt to shorten a link
   let link = {
     use json <- result.try(parse_json(req))
-
     use url <- result.try(get_url(json))
 
     case get_requested_back_half(json) {
@@ -128,6 +84,7 @@ pub fn shorten(req: Request, ctx) -> Response {
   }
 
   case link {
+    // if it was successful, return a success response
     Ok(Link(back_half, original_url, _, created)) -> {
       json_response(
         code: 201,
@@ -139,49 +96,13 @@ pub fn shorten(req: Request, ctx) -> Response {
         ]),
       )
     }
-    Error(err) -> {
-      case err {
-        // if the error was caused by an invalid type
-        error.JsonError(json.UnexpectedFormat([dynamic.DecodeError(e, f, _)])) ->
-          json_response(
-            400,
-            False,
-            string(
-              "Invalid data type (expected " <> e <> ", found " <> f <> ")",
-            ),
-          )
-        error.JsonError(_) ->
-          json_response(code: 400, success: False, body: string("Invalid JSON"))
-        error.Conflict ->
-          json_response(
-            409,
-            False,
-            string("Requested back half already in use"),
-          )
-        error.InvalidUrl ->
-          json_response(code: 400, success: False, body: string("Invalid URL"))
-        error.InvalidBackHalf ->
-          json_response(
-            code: 400,
-            success: False,
-            body: string(
-              "Requested back half invalid: must be between 3 and 32 characters long and only contain characters A-Z, a-z, 0-9, '-', and '_'",
-            ),
-          )
-
-        _ ->
-          json_response(
-            code: 500,
-            success: False,
-            body: string("An unexpected error"),
-          )
-      }
-    }
+    // if unsuccessful, pattern match the error
+    Error(err) -> handle_shorten_errors(err)
   }
 }
 
 // get info about a given link. most work is done in the get() function
-pub fn info(ctx, link) {
+pub fn info(ctx, link) -> Response {
   case get(link, ctx) {
     // if a link was found in the database, respond with all info on the link
     Ok(Link(back_half, original_url, hits, created)) -> {
@@ -218,7 +139,7 @@ pub fn info(ctx, link) {
 }
 
 // increment the hit value of a link with the given back_half
-pub fn hit(back_half, ctx: web.Context) {
+pub fn hit(back_half, ctx: web.Context) -> Result(Int, AppError) {
   let stmt =
     "
   UPDATE links 
@@ -235,27 +156,15 @@ pub fn hit(back_half, ctx: web.Context) {
       with: [sqlight.text(back_half)],
       expecting: link_decoder(),
     )
-    // if there's an error, return an error
+    // if there's an error, return and log it
     |> result.map_error(fn(error) {
-      case error.code, error.message {
-        sqlight.ConstraintCheck, "CHECK constraint failed: empty_content" ->
-          error.ContentRequired
-        sqlight.ConstraintPrimarykey,
-          "UNIQUE constraint failed: links.back_half"
-        -> {
-          error.SqlightError(error)
-        }
-        _, _ -> {
-          io.debug(error.code)
-          io.debug(error.message)
-          error.BadRequest
-        }
-      }
+      wisp.log_warning(error.message)
+      io.debug(error.code)
+      error.SqlightError(error)
     }),
   )
 
-  // if no link was found, return an error. otherwise return the new amount
-  // (cont.) of hits
+  // return updated hit count if there was a matching record, otherwise error
   case rows {
     [] -> {
       Error(error.NotFound)
@@ -263,6 +172,83 @@ pub fn hit(back_half, ctx: web.Context) {
     [link, ..] -> {
       Ok(link.hits)
     }
+  }
+}
+
+// take in an HTTP request and attempts to decode the body as JSON
+fn parse_json(req: Request) -> Result(Dict(String, String), AppError) {
+  let json =
+    wisp.read_body_to_bitstring(req)
+    |> result.unwrap(<<0>>)
+    |> json.decode_bits(dynamic.dict(dynamic.string, dynamic.string))
+
+  case json {
+    Ok(j) -> Ok(j)
+    Error(e) -> Error(error.JsonError(e))
+  }
+}
+
+// attempt to find the "url" value in our JSON object. if it exists, validate it
+fn get_url(json: Dict(String, String)) -> Result(String, AppError) {
+  case dict.get(json, "url") {
+    Ok(url) -> {
+      case uri.parse(url) {
+        Ok(uri.Uri(protocol, ..))
+          if protocol == Some("http") || protocol == Some("https")
+        -> Ok(url)
+        _ -> Error(error.InvalidUrl)
+      }
+    }
+    Error(_) -> Error(error.InvalidUrl)
+  }
+}
+
+// see if theres a "back_half" key-value pair in our JSON object
+fn get_requested_back_half(
+  json: Dict(String, String),
+) -> Result(Option(String), AppError) {
+  case dict.get(json, "back_half") {
+    Ok(back_half) -> {
+      let assert Ok(r) = regex.from_string("^[A-Za-z0-9_-]{3,32}$")
+      case regex.check(r, back_half) {
+        True -> Ok(Some(back_half))
+        False -> Error(error.InvalidBackHalf)
+      }
+    }
+    Error(_) -> Ok(None)
+  }
+}
+
+// provide the user different error responses based on the given error
+fn handle_shorten_errors(err) -> Response {
+  case err {
+    // if the error was caused by an invalid type
+    error.JsonError(json.UnexpectedFormat([dynamic.DecodeError(e, f, _)])) ->
+      json_response(
+        400,
+        False,
+        string("Invalid data type (expected " <> e <> ", found " <> f <> ")"),
+      )
+    error.JsonError(_) ->
+      json_response(code: 400, success: False, body: string("Invalid JSON"))
+    error.Conflict ->
+      json_response(409, False, string("Requested back half already in use"))
+    error.InvalidUrl ->
+      json_response(code: 400, success: False, body: string("Invalid URL"))
+    error.InvalidBackHalf ->
+      json_response(
+        code: 400,
+        success: False,
+        body: string(
+          "Requested back half invalid: must be between 3 and 32 characters long and only contain characters A-Z, a-z, 0-9, '-', and '_'",
+        ),
+      )
+    _ ->
+      json_response(
+        code: 500,
+        success: False,
+        body: string("An unexpected error occurred"),
+      )
   }
 }
 
@@ -311,19 +297,15 @@ fn insert_link(
       let assert [link] = row
       Ok(link)
     }
-    // if the query failed, return an error or try again with a 1 digit longer
-    // (cont.) random back half
+    // if the query failed, 
     Error(err) -> {
-      case err.code, err.message {
-        // if a collision happened (i.e. tried to insert with the same 
-        // (cont.) back half)
-        sqlight.ConstraintPrimarykey,
-          "UNIQUE constraint failed: links.back_half"
-        -> {
+      case err.code {
+        // if a collision happens...
+        sqlight.ConstraintPrimarykey -> {
           case option.is_some(i) {
+            // random back half was used, log and try again with extra digit 
             True -> {
               wisp.log_warning("Collision: \"" <> back_half <> "\"")
-
               insert_link(
                 original_url,
                 ctx,
@@ -331,11 +313,12 @@ fn insert_link(
                 Some(option.unwrap(i, 4) + 1),
               )
             }
+            // back half was specified, return error
             False -> Error(error.Conflict)
           }
         }
-        // catch all, return a bad request error and print the details
-        _, _ -> {
+        // catch all, return an error and print the details
+        _ -> {
           wisp.log_error(err.message)
           io.debug(err.code)
           Error(
