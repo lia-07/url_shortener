@@ -10,7 +10,9 @@ import gleam/result
 import gleam/string
 import gleam/uri
 import sqlight
-import url_shortener/error.{type AppError}
+import url_shortener/error.{
+  type AppError, Conflict, InvalidBackHalf, InvalidUrl, JsonError,
+}
 import url_shortener/web.{json_response}
 import wisp.{type Request, type Response}
 
@@ -19,7 +21,7 @@ pub type Link {
   Link(back_half: String, original_url: String, hits: Int, created: String)
 }
 
-// allows murky data from the database to be made into a type-safe gleam dict 
+// turns murky data from the database into a type-safe gleam dict (link constructor)
 fn link_decoder() -> dynamic.Decoder(Link) {
   dynamic.decode4(
     Link,
@@ -58,7 +60,7 @@ pub fn get(back_half: String, ctx: web.Context) -> Result(Link, AppError) {
     }),
   )
 
-  // return the first result, if there is one, otherwise an error
+  // return the first result if there is one, otherwise an error
   case rows {
     [] -> {
       Error(error.NotFound)
@@ -175,7 +177,7 @@ pub fn hit(back_half, ctx: web.Context) -> Result(Int, AppError) {
   }
 }
 
-// take in an HTTP request and attempts to decode the body as JSON
+// take in an http request and attempts to decode the body as json
 fn parse_json(req: Request) -> Result(Dict(String, String), AppError) {
   let json =
     wisp.read_body_to_bitstring(req)
@@ -188,7 +190,7 @@ fn parse_json(req: Request) -> Result(Dict(String, String), AppError) {
   }
 }
 
-// attempt to find the "url" value in our JSON object. if it exists, validate it
+// attempt to find the "url" value in our json object. if it exists, validate it
 fn get_url(json: Dict(String, String)) -> Result(String, AppError) {
   case dict.get(json, "url") {
     Ok(url) -> {
@@ -203,7 +205,7 @@ fn get_url(json: Dict(String, String)) -> Result(String, AppError) {
   }
 }
 
-// see if theres a "back_half" key-value pair in our JSON object
+// see if theres a "back_half" key-value pair in our json object
 fn get_requested_back_half(
   json: Dict(String, String),
 ) -> Result(Option(String), AppError) {
@@ -223,19 +225,19 @@ fn get_requested_back_half(
 fn handle_shorten_errors(err) -> Response {
   case err {
     // if the error was caused by an invalid type
-    error.JsonError(json.UnexpectedFormat([dynamic.DecodeError(e, f, _)])) ->
+    JsonError(json.UnexpectedFormat([dynamic.DecodeError(e, f, _)])) ->
       json_response(
         400,
         False,
         string("Invalid data type (expected " <> e <> ", found " <> f <> ")"),
       )
-    error.JsonError(_) ->
+    JsonError(_) ->
       json_response(code: 400, success: False, body: string("Invalid JSON"))
-    error.Conflict ->
+    Conflict ->
       json_response(409, False, string("Requested back half already in use"))
-    error.InvalidUrl ->
+    InvalidUrl ->
       json_response(code: 400, success: False, body: string("Invalid URL"))
-    error.InvalidBackHalf ->
+    InvalidBackHalf ->
       json_response(
         code: 400,
         success: False,

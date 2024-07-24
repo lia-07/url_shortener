@@ -7,7 +7,7 @@ pub type Context {
   Context(db: sqlight.Connection)
 }
 
-// wisp stuff
+// wisp middleware stuff
 pub fn middleware(
   req: Request,
   handle_request: fn(Request) -> Response,
@@ -20,7 +20,7 @@ pub fn middleware(
   handle_request(req)
 }
 
-// reusable wrapper for json responses returned by the api
+// reusable wrapper for json responses the api returns
 pub fn json_response(
   code code: Int,
   success success: Bool,
