@@ -11,7 +11,8 @@ import gleam/string
 import gleam/uri
 import sqlight
 import url_shortener/error.{
-  type AppError, Conflict, InvalidBackHalf, InvalidUrl, JsonError,
+  type AppError, BadRequest, Conflict, ContentRequired, InvalidBackHalf,
+  InvalidUrl, JsonError, NotFound, SqlightError,
 }
 import url_shortener/web.{json_response}
 import wisp.{type Request, type Response}
@@ -52,9 +53,9 @@ pub fn get(back_half: String, ctx: web.Context) -> Result(Link, AppError) {
     |> result.map_error(fn(error) {
       case error.code, error.message {
         sqlight.ConstraintCheck, "CHECK constraint failed: empty_content" ->
-          error.ContentRequired
+          ContentRequired
         _, _ -> {
-          error.BadRequest
+          BadRequest
         }
       }
     }),
@@ -63,7 +64,7 @@ pub fn get(back_half: String, ctx: web.Context) -> Result(Link, AppError) {
   // return the first result if there is one, otherwise an error
   case rows {
     [] -> {
-      Error(error.NotFound)
+      Error(NotFound)
     }
     [link, ..] -> {
       Ok(link)
@@ -81,7 +82,7 @@ pub fn shorten(req: Request, ctx) -> Response {
     case get_requested_back_half(json) {
       Ok(None) -> insert_link(url, ctx, None, Some(4))
       Ok(Some(back_half)) -> insert_link(url, ctx, Some(back_half), None)
-      Error(_) -> Error(error.InvalidBackHalf)
+      Error(_) -> Error(InvalidBackHalf)
     }
   }
 
@@ -122,7 +123,7 @@ pub fn info(ctx, link) -> Response {
     // if no link was found, respond with an error
     Error(err) ->
       case err {
-        error.NotFound -> {
+        NotFound -> {
           json_response(
             code: 404,
             success: False,
@@ -162,14 +163,14 @@ pub fn hit(back_half, ctx: web.Context) -> Result(Int, AppError) {
     |> result.map_error(fn(error) {
       wisp.log_warning(error.message)
       io.debug(error.code)
-      error.SqlightError(error)
+      SqlightError(error)
     }),
   )
 
   // return updated hit count if there was a matching record, otherwise error
   case rows {
     [] -> {
-      Error(error.NotFound)
+      Error(NotFound)
     }
     [link, ..] -> {
       Ok(link.hits)
@@ -186,7 +187,7 @@ fn parse_json(req: Request) -> Result(Dict(String, String), AppError) {
 
   case json {
     Ok(j) -> Ok(j)
-    Error(e) -> Error(error.JsonError(e))
+    Error(e) -> Error(JsonError(e))
   }
 }
 
@@ -198,10 +199,10 @@ fn get_url(json: Dict(String, String)) -> Result(String, AppError) {
         Ok(uri.Uri(protocol, ..))
           if protocol == Some("http") || protocol == Some("https")
         -> Ok(url)
-        _ -> Error(error.InvalidUrl)
+        _ -> Error(InvalidUrl)
       }
     }
-    Error(_) -> Error(error.InvalidUrl)
+    Error(_) -> Error(InvalidUrl)
   }
 }
 
@@ -214,7 +215,7 @@ fn get_requested_back_half(
       let assert Ok(r) = regex.from_string("^[A-Za-z0-9_-]{3,32}$")
       case regex.check(r, back_half) {
         True -> Ok(Some(back_half))
-        False -> Error(error.InvalidBackHalf)
+        False -> Error(InvalidBackHalf)
       }
     }
     Error(_) -> Ok(None)
@@ -311,7 +312,7 @@ fn insert_link(
               )
             }
             // back half was specified, return error
-            False -> Error(error.Conflict)
+            False -> Error(Conflict)
           }
         }
         // catch all, return an error and print the details
@@ -319,11 +320,7 @@ fn insert_link(
           wisp.log_error(err.message)
           io.debug(err.code)
           Error(
-            error.SqlightError(sqlight.SqlightError(
-              err.code,
-              err.message,
-              err.offset,
-            )),
+            SqlightError(sqlight.SqlightError(err.code, err.message, err.offset)),
           )
         }
       }
