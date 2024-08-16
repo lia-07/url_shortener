@@ -7,7 +7,7 @@ import wisp.{type Request, type Response}
 
 // main routing function. maps paths to functions that return responses
 pub fn handle_request(req: Request, ctx: Context) -> Response {
-  use req <- web.middleware(req)
+  use req <- web.middleware(req, ctx)
 
   case wisp.path_segments(req) {
     // if it's an api route, go to the api handler(s)

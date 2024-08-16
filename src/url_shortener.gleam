@@ -16,7 +16,8 @@ pub fn main() {
   // configure the database connection and store it in a 'context' variable
   let assert Ok(_) = database.with_connection(db_name, database.migrate_schema)
   use db <- database.with_connection(db_name)
-  let context = web.Context(db)
+
+  let context = web.Context(db, get_static_path())
 
   // prepare and start serving the application
   let handler = router.handle_request(_, context)
@@ -27,4 +28,9 @@ pub fn main() {
     |> mist.port(8000)
     |> mist.start_http
   process.sleep_forever()
+}
+
+fn get_static_path() {
+  let assert Ok(priv_path) = wisp.priv_directory("url_shortener")
+  priv_path <> "/static"
 }

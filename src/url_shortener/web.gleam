@@ -4,18 +4,20 @@ import wisp.{type Request, type Response}
 
 // type contains our context constructor. currently only holds db connection
 pub type Context {
-  Context(db: sqlight.Connection)
+  Context(db: sqlight.Connection, static_path: String)
 }
 
 // wisp middleware stuff
 pub fn middleware(
   req: Request,
+  ctx: Context,
   handle_request: fn(Request) -> Response,
 ) -> Response {
   let req = wisp.method_override(req)
   use <- wisp.log_request(req)
   use <- wisp.rescue_crashes
   use req <- wisp.handle_head(req)
+  use <- wisp.serve_static(req, under: "/static", from: ctx.static_path)
 
   handle_request(req)
 }
