@@ -1,3 +1,4 @@
+import gleam/http
 import gleam/json.{type Json}
 import sqlight
 import wisp.{type Request, type Response}
@@ -17,6 +18,7 @@ pub fn middleware(
   use <- wisp.log_request(req)
   use <- wisp.rescue_crashes
   use req <- wisp.handle_head(req)
+  use <- handle_cors(req)
   use <- wisp.serve_static(req, under: "/static", from: ctx.static_path)
 
   handle_request(req)
@@ -33,8 +35,33 @@ pub fn json_response(
     False -> #("error", content)
   }
   wisp.response(code)
+  |> add_cors_headers
   |> wisp.json_body(
     json.object([#("success", json.bool(success)), body])
     |> json.to_string_builder(),
   )
+}
+
+// cors functions, i hate cors
+pub fn handle_cors(req: Request, handler: fn() -> Response) -> Response {
+  case req.method {
+    http.Options -> handle_preflight()
+    _ -> add_cors_headers(handler())
+  }
+}
+
+fn handle_preflight() -> Response {
+  wisp.response(200)
+  |> add_cors_headers
+  |> wisp.set_header(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, OPTIONS",
+  )
+  |> wisp.set_header("Access-Control-Allow-Headers", "Content-Type")
+}
+
+fn add_cors_headers(res: Response) -> Response {
+  res
+  |> wisp.set_header("Access-Control-Allow-Origin", "*")
+  |> wisp.set_header("Access-Control-Allow-Credentials", "true")
 }
