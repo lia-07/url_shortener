@@ -14,11 +14,11 @@ pub fn render_builder(shortened_urls_so_far shortened_urls_so_far: Int) -> Strin
 		<link rel=\"icon\" href=\"./favicon.png\" />
 		<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
 		
-		<link rel=\"modulepreload\" href=\"./_app/immutable/entry/start.Eb4ddmMk.js\">
-		<link rel=\"modulepreload\" href=\"./_app/immutable/chunks/entry.DvihxTDu.js\">
+		<link rel=\"modulepreload\" href=\"./_app/immutable/entry/start.BBvLHhjK.js\">
+		<link rel=\"modulepreload\" href=\"./_app/immutable/chunks/entry.CtydYTg4.js\">
 		<link rel=\"modulepreload\" href=\"./_app/immutable/chunks/scheduler.BnBT-t0t.js\">
 		<link rel=\"modulepreload\" href=\"./_app/immutable/chunks/index.DoD25Ord.js\">
-		<link rel=\"modulepreload\" href=\"./_app/immutable/entry/app.CRJMJkxP.js\">
+		<link rel=\"modulepreload\" href=\"./_app/immutable/entry/app.De_id3Jm.js\">
 		<link rel=\"modulepreload\" href=\"./_app/immutable/chunks/index.cj5AgLOm.js\">
 	</head>
 	<body data-sveltekit-preload-data=\"hover\" data-shortened-urls=\"")
@@ -27,15 +27,15 @@ pub fn render_builder(shortened_urls_so_far shortened_urls_so_far: Int) -> Strin
 		<div style=\"display: contents\">
 			<script>
 				{
-					__sveltekit_183af6m = {
+					__sveltekit_2r1eq9 = {
 						base: new URL(\".\", location).pathname.slice(0, -1)
 					};
 
 					const element = document.currentScript.parentElement;
 
 					Promise.all([
-						import(\"./_app/immutable/entry/start.Eb4ddmMk.js\"),
-						import(\"./_app/immutable/entry/app.CRJMJkxP.js\")
+						import(\"./_app/immutable/entry/start.BBvLHhjK.js\"),
+						import(\"./_app/immutable/entry/app.De_id3Jm.js\")
 					]).then(([kit, app]) => {
 						kit.start(app, element);
 					});

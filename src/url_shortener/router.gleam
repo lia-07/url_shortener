@@ -35,7 +35,10 @@ fn shortened_link_handler(back_half, ctx) -> Response {
 
       wisp.moved_permanently(match.original_url)
     }
-    Error(_) -> wisp.not_found()
+    Error(_) ->
+      link.count(ctx)
+      |> home_template.render_builder()
+      |> wisp.html_response(404)
   }
 }
 
