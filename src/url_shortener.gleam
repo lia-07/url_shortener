@@ -32,5 +32,5 @@ pub fn main() {
 
 fn get_static_path() {
   let assert Ok(priv_path) = wisp.priv_directory("url_shortener")
-  priv_path <> "/static"
+  priv_path <> "/_app"
 }

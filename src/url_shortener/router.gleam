@@ -2,6 +2,7 @@ import gleam/http.{Get, Post}
 import gleam/json.{string}
 import gleam/string
 import url_shortener/link
+import url_shortener/templates/home as home_template
 import url_shortener/web.{type Context, json_response}
 import wisp.{type Request, type Response}
 
@@ -10,12 +11,19 @@ pub fn handle_request(req: Request, ctx: Context) -> Response {
   use req <- web.middleware(req, ctx)
 
   case wisp.path_segments(req) {
+    [] -> home_handler(ctx)
     // if it's an api route, go to the api handler(s)
     ["api", ..version] -> api_version_handler(req, ctx, version)
 
     // catch all, go to the shorten link handler
     back_half -> shortened_link_handler(string.concat(back_half), ctx)
   }
+}
+
+fn home_handler(ctx) -> Response {
+  link.count(ctx)
+  |> home_template.render_builder()
+  |> wisp.html_response(200)
 }
 
 // redirect to original url, or throw 404

@@ -72,6 +72,38 @@ pub fn get(back_half: String, ctx: web.Context) -> Result(Link, AppError) {
   }
 }
 
+pub fn count(ctx: web.Context) -> Int {
+  let stmt =
+    "
+  SELECT COUNT(DISTINCT original_url)
+  FROM links;
+  "
+  let rows =
+    sqlight.query(
+      stmt,
+      on: ctx.db,
+      with: [],
+      expecting: dynamic.element(0, dynamic.int),
+    )
+    // if there's an error, return and log it
+    |> result.map_error(fn(error) {
+      wisp.log_warning(error.message)
+      io.debug(error.code)
+      SqlightError(error)
+    })
+
+  case rows {
+    Ok([count]) -> {
+      count
+    }
+    Error(err) -> {
+      io.debug(err)
+      0
+    }
+    _ -> 0
+  }
+}
+
 // shorten a link
 pub fn shorten(req: Request, ctx) -> Response {
   // attempt to shorten a link
