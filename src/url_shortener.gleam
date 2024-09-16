@@ -4,6 +4,7 @@ import url_shortener/database
 import url_shortener/router
 import url_shortener/web
 import wisp
+import wisp/wisp_mist
 
 pub const db_name = "db.sqlite3"
 
@@ -23,7 +24,7 @@ pub fn main() {
   let handler = router.handle_request(_, context)
   let assert Ok(_) =
     handler
-    |> wisp.mist_handler(secret_key_base)
+    |> wisp_mist.handler(secret_key_base)
     |> mist.new
     |> mist.port(8000)
     |> mist.start_http

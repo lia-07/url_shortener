@@ -14,8 +14,8 @@ version = "1.2.1"
 
 [dependencies]
 gleam_stdlib = "~> 0.34 or ~> 1.0"
-wisp = "~> 0.14"
-mist = "~> 1.0"
+wisp = "~> 1.1.0"
+mist = "~> 2.0.0"
 gleam_erlang = "~> 0.25"
 sqlight = "~> 0.9"
 gleam_otp = "~> 0.10"
