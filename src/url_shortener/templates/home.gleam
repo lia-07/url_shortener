@@ -4,9 +4,14 @@ import gleam/string_builder.{type StringBuilder}
 
 import gleam/int
 
-pub fn render_builder(shortened_urls_so_far shortened_urls_so_far: Int) -> StringBuilder {
-    let builder = string_builder.from_string("")
-    let builder = string_builder.append(builder, "
+pub fn render_builder(
+  shortened_urls_so_far shortened_urls_so_far: Int,
+) -> StringBuilder {
+  let builder = string_builder.from_string("")
+  let builder =
+    string_builder.append(
+      builder,
+      "
 <!doctype html>
 <html lang=\"en\">
 	<head>
@@ -21,9 +26,14 @@ pub fn render_builder(shortened_urls_so_far shortened_urls_so_far: Int) -> Strin
 		<link rel=\"modulepreload\" href=\"./_app/immutable/entry/app.De_id3Jm.js\">
 		<link rel=\"modulepreload\" href=\"./_app/immutable/chunks/index.cj5AgLOm.js\">
 	</head>
-	<body data-sveltekit-preload-data=\"hover\" data-shortened-urls=\"")
-    let builder = string_builder.append(builder, int.to_string(shortened_urls_so_far))
-    let builder = string_builder.append(builder, "\">
+	<body data-sveltekit-preload-data=\"hover\" data-shortened-urls=\"",
+    )
+  let builder =
+    string_builder.append(builder, int.to_string(shortened_urls_so_far))
+  let builder =
+    string_builder.append(
+      builder,
+      "\">
 		<div style=\"display: contents\">
 			<script>
 				{
@@ -44,12 +54,14 @@ pub fn render_builder(shortened_urls_so_far shortened_urls_so_far: Int) -> Strin
 		</div>
 	</body>
 </html>
-")
+",
+    )
 
-    builder
+  builder
 }
 
 pub fn render(shortened_urls_so_far shortened_urls_so_far: Int) -> String {
-    string_builder.to_string(render_builder(shortened_urls_so_far: shortened_urls_so_far))
+  string_builder.to_string(render_builder(
+    shortened_urls_so_far: shortened_urls_so_far,
+  ))
 }
-
