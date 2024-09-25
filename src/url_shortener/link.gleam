@@ -109,7 +109,7 @@ pub fn shorten(req: Request, ctx) -> Response {
   // attempt to shorten a link
   let link = {
     use json <- result.try(parse_json(req))
-    use url <- result.try(get_url(json))
+    use url <- result.try(parse_url(json))
 
     case get_requested_back_half(json) {
       Ok(None) -> insert_link(url, ctx, None, Some(4))
@@ -224,7 +224,7 @@ fn parse_json(req: Request) -> Result(Dict(String, String), AppError) {
 }
 
 // attempt to find the "url" value in our json object. if it exists, validate it
-fn get_url(json: Dict(String, String)) -> Result(String, AppError) {
+fn parse_url(json: Dict(String, String)) -> Result(String, AppError) {
   case dict.get(json, "url") {
     Ok(url) -> {
       case uri.parse(url) {
