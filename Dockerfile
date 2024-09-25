@@ -1,5 +1,8 @@
 FROM ghcr.io/gleam-lang/gleam:v1.4.1-erlang-alpine
 
+RUN apk add --no-cache gcc musl-dev rebar3
+
+
 WORKDIR /build
 
 COPY . /build
